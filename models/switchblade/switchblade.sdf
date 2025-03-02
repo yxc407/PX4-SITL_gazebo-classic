@@ -544,6 +544,7 @@
       <robotNamespace></robotNamespace>
       <link_name>base_link</link_name>
       <commandSubTopic>/catapult_trigger</commandSubTopic>
+      <direction>1.0 0.0 2.0</direction>
       <force>1100</force>
       <duration>0.2</duration>
     </plugin>

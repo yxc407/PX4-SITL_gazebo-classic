@@ -77,15 +77,10 @@ void CatapultPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
     gzerr << "[gazebo_catapult_plugin] link_name needs to be provided";
   }
 
-  if (_sdf->HasElement("motorNumber"))
-    motor_number_ = _sdf->GetElement("motorNumber")->Get<int>();
-  else
-    gzerr << "[gazebo_catapult_plugin] Please specify a motorNumber.\n";
-
   getSdfParam<std::string>(_sdf, "commandSubTopic", trigger_sub_topic_, trigger_sub_topic_);
   getSdfParam<double>(_sdf, "force", force_magnitude_, force_magnitude_);
-  getSdfParam<std::string>(_sdf, "direction", trigger_sub_topic_, trigger_sub_topic_);
   getSdfParam<double>(_sdf, "duration", launch_duration_, launch_duration_);
+  getSdfParam<ignition::math::Vector3d>(_sdf, "direction", direction_, direction_);
 
   // Listen to the update event. This event is broadcast every simulation iteration.
   _updateConnection = event::Events::ConnectWorldUpdateBegin(boost::bind(&CatapultPlugin::OnUpdate, this, _1));
@@ -93,13 +88,15 @@ void CatapultPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf)
   node_handle_ = transport::NodePtr(new transport::Node());
   node_handle_->Init(namespace_);
 
-  trigger_sub_ = node_handle_->Subscribe("~/" + model_->GetName() + trigger_sub_topic_, &CatapultPlugin::VelocityCallback, this);
+  std::string topic_name = "~/" + model_->GetName() + trigger_sub_topic_;
+
+  trigger_sub_ = node_handle_->Subscribe<msgs::Int>(topic_name, &CatapultPlugin::SwitchCallback, this);
 }
 
 void CatapultPlugin::OnUpdate(const common::UpdateInfo&){
 
     //Launch vehicle if the vehilce is armed
-    if(ref_motor_rot_vel_ > arm_rot_vel_ && launch_status_ != VEHICLE_LAUNCHED ) {
+    if(switch_ && launch_status_ != VEHICLE_LAUNCHED) {
       if(launch_status_ == VEHICLE_STANDBY) {
       #if GAZEBO_MAJOR_VERSION >= 9
         trigger_time_ = world_->SimTime();
@@ -108,30 +105,30 @@ void CatapultPlugin::OnUpdate(const common::UpdateInfo&){
       #endif
         launch_status_ = VEHICLE_INLAUNCH;
         std::cout << "[gazebo_catapult_plugin] Catapult armed " << std::endl;
-      
-      } else { // launch_status = VEHICLE_INLAUNCH
-        //Define launch direction
-        ignition::math::Vector3d direction(1.0, 0.0, 2.0);
-        direction.Normalize();
+
+      } else if(launch_status_ == VEHICLE_INLAUNCH){ // launch_status = VEHICLE_INLAUNCH
+	direction_.Normalize();
 
         //Apply force to the vehicle
-        ignition::math::Vector3d force = force_magnitude_ * direction;
-        this->link_->AddForce(force);     
+        ignition::math::Vector3d force = force_magnitude_ * direction_;
+        this->link_->AddForce(force);
         #if GAZEBO_MAJOR_VERSION >= 9
           common::Time curr_time = world_->SimTime();
         #else
           common::Time curr_time = world_->GetSimTime();
         #endif
         if (curr_time - trigger_time_  > launch_duration_) launch_status_ = VEHICLE_LAUNCHED;
+      } else if(launch_status_ == VEHICLE_LAUNCHED) {
+        switch_ = false;
       }
     }
 }
 
-void CatapultPlugin::VelocityCallback(CommandMotorSpeedPtr &rot_velocities) {
-  if(rot_velocities->motor_speed_size() < motor_number_) {
-    std::cout  << "You tried to access index " << motor_number_
-      << " of the MotorSpeed message array which is of size " << rot_velocities->motor_speed_size() << "." << std::endl;
-  } else ref_motor_rot_vel_ = std::min(static_cast<double>(rot_velocities->motor_speed(motor_number_)), static_cast<double>(max_rot_velocity_));
+void CatapultPlugin::SwitchCallback(triggerMsg &msg) {
+    if(!triggered_ && msg->data() == 1) {
+        switch_ = true;
+        triggered_ = true;
+    }
 }
 
 } // namespace gazebo

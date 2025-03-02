@@ -61,7 +61,7 @@
 namespace gazebo
 {
 
-typedef const boost::shared_ptr<const mav_msgs::msgs::CommandMotorSpeed> CommandMotorSpeedPtr;
+typedef const boost::shared_ptr<const msgs::Int> triggerMsg;
 
 enum LaunchStatus {
     VEHICLE_STANDBY,
@@ -80,8 +80,7 @@ protected:
   virtual void OnUpdate(const common::UpdateInfo&);
 
 private:
-  void TriggerCallback(const boost::shared_ptr<const msgs::Int> &_msg);
-  void VelocityCallback(CommandMotorSpeedPtr &rot_velocities);
+  void SwitchCallback(triggerMsg &msg);
 
   std::string namespace_;
   physics::ModelPtr model_;
@@ -92,15 +91,15 @@ private:
 
   LaunchStatus launch_status_ = VEHICLE_STANDBY;
   common::Time trigger_time_;
-  
-  double max_rot_velocity_ = 3500;
-  double ref_motor_rot_vel_ = 0.0;
-  double arm_rot_vel_ = 100;
+
   double launch_duration_ = 0.01;
   double force_magnitude_ = 1.0;
-  int motor_number_;
+  ignition::math::Vector3d direction_ = ignition::math::Vector3d(0.0, 1.0, 0.0);
 
-  std::string trigger_sub_topic_ = "/gazebo/command/motor_speed";
+  bool switch_ = false;
+  bool triggered_ = false;
+
+  std::string trigger_sub_topic_ = "/catapult_trigger";
 
   transport::NodePtr node_handle_;
   transport::SubscriberPtr trigger_sub_;

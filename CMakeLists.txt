@@ -321,7 +321,6 @@ set(physics_msgs
 set(std_msgs msgs/Int32.proto)
 set(sensor_msgs
   msgs/Airspeed.proto
-  msgs/AttackPosition.proto
   msgs/Imu.proto
   msgs/IRLock.proto
   msgs/TargetRelative.proto
